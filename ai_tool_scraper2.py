@@ -19,7 +19,7 @@ def main():
     domain = parsed_url.hostname
 
     # Load JSON configuration
-    with open('config.json', 'r') as f:
+    with open('ai-tool-scraper-config.json', 'r') as f:
         config = json.load(f)
 
     if domain not in config:

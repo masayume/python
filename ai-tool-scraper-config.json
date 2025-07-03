@@ -1,0 +1,11 @@
+{
+  "visualelectric.com": {
+    "image_dom": "div.image_simple__VLb1v.simpleAsset_detailed__9OMBM img",
+    "prompt_dom": "div[class*='prompt']"
+  },
+  "www.artbreeder.com": {
+    "image_dom": "img[data-testid=\"main-image\"]",
+    "prompt_dom": "p.text-style-longform.text-sm"
+  }
+
+}
