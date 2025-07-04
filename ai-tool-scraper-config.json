@@ -6,6 +6,16 @@
   "www.artbreeder.com": {
     "image_dom": "img[data-testid=\"main-image\"]",
     "prompt_dom": "p.text-style-longform.text-sm"
+  },
+  "www.themoviedb.org": {
+    "image_dom": "img[class=\"poster w-full\"]",
+    "prompt_dom": "div[class*='overview']",
+    "more": {
+      "title":  "div[class*='title']",
+      "year":   "div[class*='year']",
+      "score":  "div[class*='score']",
+      "genre":  "div[class*='genre']"
+    }
   }
 
 }

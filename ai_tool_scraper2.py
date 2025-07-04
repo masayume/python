@@ -23,7 +23,7 @@ def main():
         config = json.load(f)
 
     if domain not in config:
-        print(f"Domain {domain} not supported in config.json")
+        print(f"Domain {domain} not supported in ai-tool-scraper-config.json")
         return
 
     selectors = config[domain]
