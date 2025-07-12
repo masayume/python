@@ -3,6 +3,8 @@ from bs4 import BeautifulSoup
 import json
 import argparse # Import the argparse module
 import re
+import os
+import mimetypes
 from urllib.parse import urljoin
 
 def scrape_movie_data(url):
@@ -37,42 +39,44 @@ def scrape_movie_data(url):
         soup = BeautifulSoup(response.content, 'html.parser')
         
         # Initialize dictionary to store movie data
-        movie_data = {}
+        movie_data  = {}
+        json_data   = {}
         
-        # Extract poster URL
-        poster_element = soup.find('img', class_='poster')
-        if poster_element and poster_element.get('src'):
-            # Convert relative URL to absolute URL
-            poster_url = urljoin('https://www.themoviedb.org', poster_element['src'])
-            movie_data['poster_url'] = poster_url
+        # Extract release date
+        release_date_element = soup.find('span', class_='release_date')
+        if release_date_element:
+            movie_data['release_date'] = re.sub(r'[()]', '', release_date_element.get_text(strip=True) )
         else:
-            movie_data['poster_url'] = None
+            movie_data['release_date'] = None
 
         # Movie Title
         movie_title_element = soup.select_one("div.title.ott_true h2 a")
         movie_title = movie_title_element.get_text(strip=True) if movie_title_element else "N/A"
         print(f"Movie Title: {movie_title}")
-
         if movie_title:
             movie_data['original_title'] = movie_title
+            json_title = re.sub(r'[^a-zA-Z0-9]', '', movie_title) + re.sub(r'[()]', '',  movie_data['release_date'])
+            json_data[json_title] = {}
+            json_data[json_title]['number'] = 1 ###TODO
+            json_data[json_title]['name'] = movie_title
+            json_data[json_title]['year'] = movie_data['release_date']
         else:
             movie_data['original_title'] = None
+
+        # Extract poster URL
+        poster_element = soup.find('img', class_='poster')
+        if poster_element and poster_element.get('src'):
+            # Convert relative URL to absolute URL
+            poster_url = urljoin('https://www.themoviedb.org', poster_element['src'])
+            movie_data['poster_url'] = poster_url            
+        else:
+            movie_data['poster_url'] = None
         
-        # If the genres_span is found, find all the <a> tags within it
-#        if genres_span:
-#            genre_links = genres_span.find_all('a')
-#            for link in genre_links:
-#                genres.append(link.get_text(strip=True))
+        json_data[json_title]['img'] = movie_data['poster_url']
 
         # Extract movie genres
         genres = []
         genre_elements = soup.find_all('span', class_='genres')
-#        for genre_element in genre_elements:
-#            genre_text = genre_element.get_text(strip=True)
-#            if genre_text:
-#                genres.append(genre_text)
-
-
         for genre_span in genre_elements:
             # Find all <a> tags within the current span.genres element
             genre_links = genre_span.find_all('a')
@@ -83,15 +87,8 @@ def scrape_movie_data(url):
 
 
         movie_data['genres'] = genres
+        json_data[json_title]['theme'] = genres
 
-        
-        # Extract release date
-        release_date_element = soup.find('span', class_='release')
-        if release_date_element:
-            movie_data['release_date'] = release_date_element.get_text(strip=True)
-        else:
-            movie_data['release_date'] = None
-        
         # Extract director information
         directors = []
         
@@ -148,7 +145,8 @@ def scrape_movie_data(url):
                             break
         
         movie_data['directors'] = directors
-        
+        json_data[json_title]['author'] = directors
+
         # Extract cast information
         cast_members = []
         
@@ -165,7 +163,8 @@ def scrape_movie_data(url):
                     if (actor_name and 
                         len(actor_name) > 2 and 
                         actor_name.lower() not in ['view more', 'more', 'see all', 'view all', 'cast', 'crew']):
-                        cast_members.append({'actor_name': actor_name})
+                        # cast_members.append({'actor_name': actor_name})
+                        cast_members.append(actor_name)
         
         # Method 2: Look for cast in people lists with better filtering
         if not cast_members:
@@ -182,7 +181,9 @@ def scrape_movie_data(url):
                             if (actor_name and 
                                 len(actor_name) > 2 and 
                                 not any(word in actor_name.lower() for word in ['view', 'more', 'see all', 'cast', 'crew', 'show all'])):
-                                cast_members.append({'actor_name': actor_name})
+                                # cast_members.append({'actor_name': actor_name})
+                                cast_members.append(actor_name)
+
         
         # Method 3: Look for specific cast section with h3 "Cast" heading
         if not cast_members:
@@ -198,7 +199,9 @@ def scrape_movie_data(url):
                         if (actor_name and 
                             len(actor_name) > 2 and 
                             not any(word in actor_name.lower() for word in ['view', 'more', 'see', 'all', 'cast', 'crew', 'show'])):
-                            cast_members.append({'actor_name': actor_name})
+                            # cast_members.append({'actor_name': actor_name})
+                            cast_members.append(actor_name)
+
         
         # Method 4: Look for profile cards specifically
         if not cast_members:
@@ -214,7 +217,8 @@ def scrape_movie_data(url):
                         actor_name and 
                         len(actor_name) > 2 and 
                         not any(word in actor_name.lower() for word in ['view', 'more', 'see', 'all', 'cast', 'crew', 'show'])):
-                        cast_members.append({'actor_name': actor_name})
+                        # cast_members.append({'actor_name': actor_name})
+                        cast_members.append(actor_name)
         
         # Method 5: Look for cast member names in any section with "cast" in the class or id
         if not cast_members:
@@ -232,19 +236,22 @@ def scrape_movie_data(url):
                         if (actor_name and 
                             len(actor_name) > 2 and 
                             not any(word in actor_name.lower() for word in ['view', 'more', 'see', 'all', 'cast', 'crew', 'show'])):
-                            cast_members.append({'actor_name': actor_name})
-        
+                            # cast_members.append({'actor_name': actor_name})
+                            cast_members.append(actor_name)
+
         # Remove duplicates while preserving order
-        seen = set()
-        unique_cast = []
-        for member in cast_members:
-            name = member['actor_name']
-            if name not in seen:
-                seen.add(name)
-                unique_cast.append(member)
+#        seen = set()
+#        unique_cast = []
+#        for member in cast_members:
+#            name = member['actor_name']
+#            if name not in seen:
+#                seen.add(name)
+#                unique_cast.append(member)
         
-        movie_data['cast'] = unique_cast
-        
+        # movie_data['cast'] = unique_cast
+        movie_data['cast'] = cast_members
+        json_data[json_title]['cast'] = cast_members
+
         # Extract additional interesting data
         
         # Extract runtime
@@ -253,6 +260,8 @@ def scrape_movie_data(url):
             movie_data['runtime'] = runtime_element.get_text(strip=True)
         else:
             movie_data['runtime'] = None
+
+        json_data[json_title]['length'] = movie_data['runtime']    
         
         # Extract rating/score
         score_element = soup.find('div', class_='user_score_chart')
@@ -262,6 +271,8 @@ def scrape_movie_data(url):
                 movie_data['user_score'] = f"{score_text}%"
         else:
             movie_data['user_score'] = None
+
+        json_data[json_title]['score'] = movie_data['user_score']    
         
         # Extract overview/plot
         overview_element = soup.find('div', class_='overview')
@@ -271,6 +282,8 @@ def scrape_movie_data(url):
                 movie_data['overview'] = overview_text.get_text(strip=True)
         else:
             movie_data['overview'] = None
+
+        json_data[json_title]['overview'] = movie_data['overview']    
         
         # Extract tagline
         tagline_element = soup.find('h3', class_='tagline')
@@ -278,8 +291,15 @@ def scrape_movie_data(url):
             movie_data['tagline'] = tagline_element.get_text(strip=True)
         else:
             movie_data['tagline'] = None
+
+        json_data[json_title]['tagline'] = movie_data['tagline']    
+
+        json_data[json_title]['url'] = url
+
+        jsondump = json.dumps(json_data, indent=2)
+        print(f"\njson_data:\n{jsondump} \n")
         
-        return movie_data
+        return json_data
         
     except requests.RequestException as e:
         print(f"Error fetching the webpage: {e}")
@@ -325,8 +345,8 @@ def print_movie_data(movie_data):
     if cast:
         print(f"\nCast ({len(cast)} members):")
         for i, actor in enumerate(cast[:10]):  # Show first 10 cast members
-            actor_name = actor.get('actor_name', 'Unknown Actor')
-            print(f"  {i+1}. {actor_name}")
+            # actor_name = actor.get('Unknown Actor')
+            print(f"  {i+1}")
         if len(cast) > 10:
             print(f"  ... and {len(cast) - 10} more cast members")
     else:
@@ -352,6 +372,8 @@ def main():
     Main function to run the movie scraper
     """
 
+    download_folder = "/home/masayume/DATA/E/INSPIRE/@COVERS/MediaCollection/"
+    
     # The Shawshank Redemption TMDb URL with English language parameter
     movie_url = "https://www.themoviedb.org/movie/278-the-shawshank-redemption?language=en-US"
 
@@ -379,7 +401,36 @@ def main():
         print_movie_data(movie_data)
         
         # Save to JSON file
-        save_to_json(movie_data)
+        firstkey = []
+        firstkey = list(movie_data.keys())
+
+        filename = os.path.join(download_folder, firstkey[0] + ".json")
+
+        response = requests.get(movie_data[firstkey[0]]['img'], stream=True)
+        response.raise_for_status() # Raise an HTTPError for bad responses (4xx or 5xx)
+        content_type = response.headers.get('Content-Type')
+        extension = mimetypes.guess_extension(content_type) if content_type else None
+        poster_name = f"{firstkey[0]}{extension}"
+        file_path = os.path.join(download_folder, poster_name)
+
+        # Download the image in chunks
+        with open(file_path, 'wb') as f:
+            for chunk in response.iter_content(chunk_size=8192):
+                f.write(chunk)
+
+        movie_data[firstkey[0]]['img'] = firstkey[0] + extension
+
+        save_to_json(movie_data, filename)
+
+        print(f"Successfully downloaded poster for '{firstkey[0]}' to: {download_folder}")
+  
+        # Determine the file extension
+        # 1. Try to get it from the Content-Type header
+        content_type = response.headers.get('Content-Type')
+        extension = mimetypes.guess_extension(content_type) if content_type else None
+
+
+###TODO save the poster img (movie_data['poster_url']) too as firstkey[0] . proper image extension
         
         print("\nScraping completed successfully!")
     else:

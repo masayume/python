@@ -11,10 +11,15 @@
     "image_dom": "img[class=\"poster w-full\"]",
     "prompt_dom": "div[class*='overview']",
     "more": {
-      "title":  "div[class*='title']",
-      "year":   "div[class*='year']",
-      "score":  "div[class*='score']",
-      "genre":  "div[class*='genre']"
+      "title_dom":    "div.title.ott_true h2 a",
+      "year_dom":     "div.title.ott_true h2 span.release_date", 
+      "tagline_dom":  "h3.tagline",
+      "score_dom":    "div[class*='score']",
+      "genre_dom":    "span.genres a",
+      "runtime_dom":  "span.runtime",
+      "overview_dom": "div.overview p"
+
+      
     }
   }
 
